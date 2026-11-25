@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Comparison slider fixture</title>
+  <!-- Test/reference page for the before/after slider. Use this markup on the
+       homepage for photos taken from the same position. Not part of the build. -->
+</head>
+<body>
+  <main class="wrap" style="padding: 40vh 0 120vh">
+    <figure class="compare" data-compare>
+      <div class="compare__frame" style="aspect-ratio: 2000 / 1126">
+        <img class="compare__after" src="/images/house-after-white-1200.webp" width="2000" height="1126" alt="After: walls painted white">
+        <div class="compare__before">
+          <img src="/images/house-before-yellow-1200.webp" width="2000" height="1126" alt="Before: yellow walls">
+        </div>
+        <span class="label">Before</span>
+        <span class="label label--after">After</span>
+        <div class="compare__handle" role="slider" tabindex="0" aria-label="Before and after divider"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+          <span class="compare__knob" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+        </div>
+      </div>
+      <figcaption>Fixture only: these two photos are not from the same position.</figcaption>
+    </figure>
+  </main>
+  <script type="module">
+    import '/src/styles.css';
+    import { initCompare } from '/src/compare.js';
+    initCompare();
+  </script>
+</body>
+</html>
