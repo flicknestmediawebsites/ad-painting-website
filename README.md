@@ -1,49 +1,52 @@
 # A.D painting & Special FX. — website
 
-A single-page site for Aaron Dorman's painting and decorative finishes business.
-It is built with Vite and plain HTML, CSS and JavaScript, with no framework.
+Multi-page static website for a Canberra painting, decorating and special FX business:
+a long, scroll-animated homepage, Services (overview plus six service pages), Projects
+(before & after plus gallery), About, Contact (map and quote form), Blog (six articles) and a 404 page.
+
+Built with Vite plus a small static page generator: no framework and no server needed.
 
 ## Commands
 
 ```bash
 npm install
-npm run dev        # local dev server
-npm run build      # production build → dist/
-npm run check      # static checks on dist/ (links, ids, alt text, metadata, contrast)
-npm test           # Playwright end-to-end checks (desktop, mobile, reduced motion, slider)
-npm run images     # regenerate responsive images from assets/source/
+npm run build      # build everything into dist/
+npm run preview    # preview the built site at http://localhost:4173
+npm run check      # static checks (ids, links, alt text, metadata, contrast)
+npm test           # Playwright tests (all pages, desktop + mobile, scroll effects, forms…)
+npm run package    # build + ad-painting-website-hostinger.zip for upload
 ```
 
-Deploy the `dist/` folder to any static host.
-
-## Where things live
+## Editing content
 
 | What | File |
 | --- | --- |
-| Page content and markup | `index.html` |
-| **Social links (footer icons)** | `src/social-links.js`: change each `href` from `/` to the real profile URL |
-| Styles and colour tokens | `src/styles.css` |
-| Scroll choreography | `src/motion.js` |
-| Photo viewer | `src/lightbox.js` |
-| Before/after slider | `src/compare.js` (example markup: `tests/fixtures/compare.html`) |
-| Original photos | `assets/source/` |
+| Business details (name, phone, email, address, map, domain) | `site/data.js` → `business` |
+| Services (text, photos, FAQs, before & afters) | `site/data.js` → `services` |
+| Before & after projects | `site/data.js` → `pairs` |
+| Finished work gallery | `site/data.js` → `gallery` |
+| Photo descriptions (alt text) | `site/data.js` → `alt` |
+| Blog posts | `site/posts.js` |
+| Page layouts | `site/pages.js`; shared header/footer in `site/render.js` |
+| Social links (footer icons) | `src/social-links.js` |
+| Styles / scroll effects | `src/styles.css`, `src/motion.js` |
 
-## Adding photos
+**Domain / SEO:** set `business.siteUrl` in `site/data.js` (e.g. `https://www.example.com.au`) to add
+canonical links, full social-preview URLs and `sitemap.xml` on the next build.
 
-1. Put the original JPEG in `assets/source/` and run `npm run images`.
-2. In `index.html`, use `<x-img name="file-name" alt="…" sizes="…"></x-img>`.
-   At build time it becomes a `<picture>` with AVIF, WebP and JPEG sources and fixed dimensions.
+## Photos
 
-**Rock and marble photos:** the "Rock and marble effects" section currently uses illustrative
-textures (`public/images/texture-*.webp`) with a note saying so. When photos of Aaron's
-decorative work are available, replace the two `<img>` tags in `.finishes__wide` (the full view)
-and `.finishes__detail` (a close-up crop of the same photo). Then remove the `.finishes__note`
-line and the texture image in the services frame (`data-service-pic="5"`).
+1. Put the original photos in a folder and list them in `PHOTOS` in `scripts/process-photos.py`.
+2. `npm run photos -- <folder>` crops phone watermarks, applies a light enhancement and aligns
+   slider pairs into `assets/source/`.
+3. `npm run images` builds the responsive AVIF/WebP/JPEG versions into `public/images/` (only changed photos).
+4. Use the photo name in `site/data.js`.
 
-**Before-and-after projects:** each job is an `<article class="pair">` in the Projects section.
-Copy an existing one, change the two `<x-img>` names and the captions, and add `pair--portrait` for
-upright photos. The scroll animation applies automatically.
+A before & after pair with `compare: true` uses the draggable slider. Only use it for photos taken from
+the same position (the script aligns them); other pairs are shown side by side.
 
-**Matched before/after photos:** if a pair is taken from the same position, use the draggable
-slider markup from `tests/fixtures/compare.html` in the Projects section. Pairs taken from
-different angles should stay as labelled side-by-side photos (the `.pair` block).
+## Hosting (Hostinger)
+
+Run `npm run package` and upload `ad-painting-website-hostinger.zip` to `public_html` in Hostinger's
+File Manager, extract it (replace existing files), then delete the zip. The included `.htaccess` sets the
+404 page, compression and caching.

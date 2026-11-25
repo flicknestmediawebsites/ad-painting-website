@@ -4,12 +4,13 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "build": "vite build && node scripts/build-pages.mjs",
+    "preview": "vite preview --port 4173",
+    "photos": "python3 scripts/process-photos.py",
     "images": "node scripts/optimize-images.mjs",
-    "build": "vite build",
-    "preview": "vite preview",
     "check": "node scripts/check-html.mjs",
-    "test": "node scripts/e2e.mjs"
+    "test": "node scripts/e2e.mjs",
+    "package": "npm run build && cd dist && rm -f ../ad-painting-website-hostinger.zip && zip -qr ../ad-painting-website-hostinger.zip . -x 'pages.json' -x '.vite/*'"
   },
   "devDependencies": {
     "sharp": "^0.33.5",

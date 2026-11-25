@@ -1,23 +1,20 @@
-// End-to-end checks with Playwright (Chromium).
+// End-to-end checks with Playwright (Chromium) against the built site.
 // Usage: npm run build && npm test
-// Starts `vite preview` (built site) and `vite` (dev server, for the slider fixture).
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
+import { readFileSync, existsSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const { chromium, devices } = require('playwright');
 
 const SITE = 'http://localhost:4317';
-const DEV = 'http://localhost:4318';
-let failures = 0;
-let passes = 0;
+const pages = JSON.parse(readFileSync('dist/pages.json', 'utf8'));
+let passes = 0, failures = 0;
 const check = (cond, msg) => {
-  if (cond) { passes++; console.log(`  ✓ ${msg}`); }
-  else { failures++; console.log(`  ✗ ${msg}`); }
+  if (cond) { passes++; console.log(`  ✓ ${msg}`); } else { failures++; console.log(`  ✗ ${msg}`); }
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Real touch-event swipe (finger moves by dx/dy) through the DevTools protocol.
 async function touchSwipe(cdp, x, y, dx, dy, steps = 12) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
   for (let i = 1; i <= steps; i++) {
@@ -26,23 +23,9 @@ async function touchSwipe(cdp, x, y, dx, dy, steps = 12) {
   }
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
-
-function serve(args, url) {
-  const p = spawn('npx', ['vite', ...args], { stdio: 'ignore' });
-  return (async () => {
-    for (let i = 0; i < 60; i++) {
-      try { if ((await fetch(url)).ok) return p; } catch {}
-      await sleep(250);
-    }
-    throw new Error(`server did not start: ${url}`);
-  })();
-}
-
 async function settle(page) {
-  // Wait until scrolling (including smooth anchor scrolling) has started and stopped.
   await sleep(150);
-  let last = -1;
-  let stable = 0;
+  let last = -1, stable = 0;
   for (let i = 0; i < 60 && stable < 2; i++) {
     const y = await page.evaluate(() => scrollY);
     stable = y === last ? stable + 1 : 0;
@@ -51,383 +34,330 @@ async function settle(page) {
   }
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 }
+const scrollTo = async (page, y) => { await page.evaluate((v) => window.scrollTo({ top: v, behavior: 'instant' }), y); await settle(page); };
+const topOf = (page, sel) => page.evaluate((s) => document.querySelector(s).getBoundingClientRect().top + scrollY, sel);
+const local = (u) => u.startsWith(SITE);
 
-const scrollTo = async (page, y) => {
-  await page.evaluate((v) => window.scrollTo({ top: v, behavior: 'instant' }), y);
-  await settle(page);
-};
-
-const headingVisibleBelowHeader = (page, id) =>
-  page.evaluate((sel) => {
-    const h = document.querySelector(`${sel} h2`);
-    const header = document.querySelector('.site-header__bar').getBoundingClientRect();
-    const r = h.getBoundingClientRect();
-    return { ok: r.top >= header.bottom - 1 && r.bottom <= innerHeight, top: Math.round(r.top), headerBottom: Math.round(header.bottom) };
-  }, id);
-
-async function desktop(browser) {
-  console.log('\nDesktop 1440×900');
+async function crawl(browser) {
+  console.log('\nAll pages (desktop 1440×900)');
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-  await page.goto(SITE, { waitUntil: 'networkidle' });
-
-  // Metadata & content
-  check((await page.title()).includes('A.D painting & Special FX.'), 'page title names the business');
-  const desc = await page.getAttribute('meta[name="description"]', 'content');
-  check(/house painting/i.test(desc) && /marble/i.test(desc) && /plaster/i.test(desc), 'meta description lists real services');
-  check(await page.locator('link[rel="icon"][href="favicon.svg"]').count() === 1, 'favicon linked');
-  check((await page.textContent('h1')).trim() === 'House painting and decorative finishes', 'hero headline exact');
-  check((await page.textContent('.hero__brand')).trim() === 'A.D painting & Special FX.', 'business name exact in hero');
-  for (const name of ['Request a quote', 'View projects']) {
-    check(await page.locator('.hero__actions a', { hasText: name }).isVisible(), `hero action "${name}" visible`);
+  const titles = new Set(), descs = new Set();
+  const known = new Set(pages.map((p) => p.path));
+  const links = new Set();
+  let allOk = true;
+  for (const p of pages) {
+    const errors = [];
+    const onErr = (e) => errors.push(e.message || String(e));
+    const onCon = (m) => m.type() === 'error' && !/maps|google/i.test(m.text()) && errors.push(m.text());
+    const onRes = (r) => local(r.url()) && r.status() >= 400 && errors.push(`${r.status()} ${r.url()}`);
+    page.on('pageerror', onErr); page.on('console', onCon); page.on('response', onRes);
+    await page.goto(SITE + p.path, { waitUntil: 'load' });
+    await sleep(300);
+    const info = await page.evaluate(() => ({
+      title: document.title,
+      desc: document.querySelector('meta[name=description]')?.content || '',
+      h1: document.querySelectorAll('h1').length,
+      overflow: document.documentElement.scrollWidth - innerWidth,
+      imgsOk: [...document.querySelectorAll('main img')].every((i) => i.getAttribute('width') && i.getAttribute('height') && i.hasAttribute('alt')),
+      text: document.body.innerText,
+      links: [...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')),
+      ld: [...document.querySelectorAll('script[type="application/ld+json"]')].map((s) => { try { return JSON.parse(s.textContent); } catch { return null; } }),
+      robots: document.querySelector('meta[name=robots]')?.content,
+    }));
+    page.off('pageerror', onErr); page.off('console', onCon); page.off('response', onRes);
+    const problems = [];
+    if (!info.title || titles.has(info.title)) problems.push('title missing/duplicate');
+    if (info.desc.length < 50 || descs.has(info.desc)) problems.push('description missing/duplicate');
+    if (info.h1 !== 1) problems.push(`${info.h1} h1s`);
+    if (info.overflow > 0) problems.push(`overflow ${info.overflow}px`);
+    if (!info.imgsOk) problems.push('image without size/alt');
+    if (p.path !== '/about/' && /Aaron|Dorman/.test(info.text)) problems.push('owner name outside About');
+    if (info.ld.some((x) => x === null)) problems.push('invalid JSON-LD');
+    if (!info.ld.some((x) => x?.['@type'] === 'HousePainter' && x.address?.streetAddress === '26 Wettenhall Circuit')) problems.push('LocalBusiness schema missing');
+    if (errors.length) problems.push(errors.join('; '));
+    titles.add(info.title); descs.add(info.desc);
+    info.links.filter((h) => h.startsWith('/')).forEach((h) => links.add(h.split('#')[0]));
+    if (problems.length) allOk = false;
+    check(!problems.length, `${p.path} ${problems.length ? '— ' + problems.join(', ') : ''}`);
+    if (p.path === '/about/') check(/Aaron Dorman is the owner/.test(info.text), 'About introduces Aaron Dorman as owner');
+    if (p.path.startsWith('/services/') && p.path !== '/services/') check(info.ld.some((x) => x?.['@type'] === 'FAQPage') && info.ld.some((x) => x?.['@type'] === 'Service'), `${p.path} has Service + FAQ schema`);
+    if (p.path.startsWith('/blog/') && p.path !== '/blog/') check(info.ld.some((x) => x?.['@type'] === 'BlogPosting'), `${p.path} has BlogPosting schema`);
+    if (p.noindex) check(info.robots === 'noindex', '404 page is noindex');
   }
-  const services = await page.$$eval('.service__title', (els) => els.map((e) => e.textContent.trim()));
-  check(services.length === 6, `six services listed (${services.join(' | ')})`);
-  check((await page.textContent('#finishes h2')).trim() === 'Rock and marble effects', 'decorative heading exact');
-  check((await page.textContent('#contact h2')).trim() === 'Tell Aaron about your project', 'contact heading exact');
-  check(await page.locator('#about', { hasText: 'Aaron Dorman' }).count() === 1, 'About names Aaron Dorman');
+  const broken = [...links].filter((h) => h && !known.has(h) && !existsSync('dist' + h));
+  check(broken.length === 0, `all internal links resolve (${links.size} checked)${broken.length ? ': ' + broken.join(', ') : ''}`);
+  check(existsSync('dist/robots.txt') && existsSync('dist/.htaccess') && existsSync('dist/404.html'), 'robots.txt, .htaccess and 404.html present');
+  await page.close();
+  return allOk;
+}
 
-  // Images
-  const imgInfo = await page.$$eval('img', (imgs) => imgs.map((i) => ({ w: i.getAttribute('width'), h: i.getAttribute('height'), loading: i.getAttribute('loading'), cls: i.className, inLightbox: !!i.closest('dialog') })));
-  check(imgInfo.filter((i) => !i.inLightbox).every((i) => i.w && i.h), 'every image reserves width/height');
-  check(imgInfo.find((i) => i.cls.includes('hero__img')).loading === 'eager', 'hero image loads eagerly');
-  check(await page.$$eval('.gallery img, .pair img', (a) => a.every((i) => i.loading === 'lazy')), 'gallery images lazy-load');
-  check(await page.$eval('.hero__img', (i) => i.complete && i.naturalWidth > 0), 'hero image displayed');
+async function mobileCrawl(browser) {
+  console.log('\nAll pages (iPhone 13)');
+  const ctx = await browser.newContext({ ...devices['iPhone 13'] });
+  const page = await ctx.newPage();
+  const bad = [];
+  for (const p of pages) {
+    await page.goto(SITE + p.path, { waitUntil: 'load' });
+    const r = await page.evaluate(() => ({ o: document.documentElement.scrollWidth - innerWidth, h1: document.querySelector('h1').getBoundingClientRect() }));
+    if (r.o > 0 || r.h1.left < 15 || r.h1.right > 390 - 15) bad.push(`${p.path} (overflow ${r.o}, h1 ${Math.round(r.h1.left)}–${Math.round(r.h1.right)})`);
+  }
+  check(!bad.length, `no sideways scrolling and headings keep the gutter on every page${bad.length ? ': ' + bad.join(', ') : ''}`);
+  await ctx.close();
+}
 
-  // Layout
-  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal scroll');
+async function home(browser) {
+  console.log('\nHomepage scroll experience (desktop)');
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await page.goto(SITE + '/', { waitUntil: 'networkidle' });
+  const probe = () => page.evaluate(() => {
+    const m = (s) => new DOMMatrixReadOnly(getComputedStyle(document.querySelector(s)).transform);
+    return {
+      stageTop: Math.round(document.querySelector('.hero__stage').getBoundingClientRect().top),
+      sheetTop: Math.round(document.querySelector('.statement').getBoundingClientRect().top),
+      mediaY: +m('.hero__media').m42.toFixed(1), contentY: +m('.hero__content').m42.toFixed(1), floatY: +m('.hero__float--b').m42.toFixed(1),
+      bg: getComputedStyle(document.querySelector('.page-bg')).backgroundColor, ink: document.documentElement.dataset.ink,
+    };
+  });
+  check(await page.evaluate(() => document.documentElement.classList.contains('tones')), 'scroll colour system active');
+  await scrollTo(page, 0); const a0 = await probe();
+  await scrollTo(page, 250); const a1 = await probe();
+  check(a1.stageTop === 0, 'hero photo holds in view at the start of scrolling');
+  check(a1.sheetTop < a0.sheetTop && a1.sheetTop < 900, `next section rises over the hero (${a0.sheetTop} → ${a1.sheetTop}px)`);
+  check(a1.contentY < a0.contentY - 30, 'headline moves upward');
+  check(a1.floatY < a1.mediaY - 20, `floating photos move faster than the background (float ${a1.floatY}px, photo ${a1.mediaY}px)`);
+  await scrollTo(page, 0); const b0 = await probe();
+  check(Math.abs(b0.contentY - a0.contentY) < 1 && Math.abs(b0.mediaY - a0.mediaY) < 1, 'scene reverses exactly when scrolling back up');
 
-  // Opening scene: hold, depth and reversibility
-  const vh = 900;
-  const probe = () =>
-    page.evaluate(() => {
-      const m = new DOMMatrixReadOnly(getComputedStyle(document.querySelector('.hero__img')).transform);
-      const c = new DOMMatrixReadOnly(getComputedStyle(document.querySelector('.hero__content')).transform);
-      return {
-        y: scrollY,
-        stageTop: Math.round(document.querySelector('.hero__stage').getBoundingClientRect().top),
-        servicesTop: Math.round(document.querySelector('.services').getBoundingClientRect().top),
-        imgY: +m.m42.toFixed(1), imgScale: +m.a.toFixed(4), contentY: +c.m42.toFixed(1),
-      };
-    });
+  // Colour effect: page background changes through the sections
+  const colours = {};
+  for (const sel of ['.statement', '.finishes', '.wall', '.process']) {
+    await scrollTo(page, (await topOf(page, sel)) + 200);
+    colours[sel] = await probe();
+  }
+  check(colours['.finishes'].bg === 'rgb(23, 22, 20)' && colours['.finishes'].ink === 'light', 'background turns charcoal with light text for Special FX');
+  check(colours['.wall'].bg === 'rgb(44, 58, 49)' && colours['.wall'].ink === 'light', 'background turns forest green for the photo wall');
+  check(colours['.process'].ink === 'dark' && colours['.process'].bg === 'rgb(233, 224, 209)', 'background returns to warm sand with dark text');
+  const midY = (await topOf(page, '.finishes')) - 900 * 0.55 + 900 * 0.12;
+  await scrollTo(page, midY);
+  const mid = await probe();
+  check(!['rgb(23, 22, 20)', 'rgb(233, 224, 209)', 'rgb(244, 239, 231)'].includes(mid.bg), `colours blend smoothly between sections (${mid.bg})`);
+
+  // Text contrast stays readable during a blend
+  const contrastOk = await page.evaluate(() => {
+    const parse = (c) => c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);
+    const L = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }).reduce((s, v, i) => s + v * [.2126, .7152, .0722][i], 0);
+    const bg = L(parse(getComputedStyle(document.querySelector('.page-bg')).backgroundColor));
+    const els = [...document.querySelectorAll('main > [data-tone]:not(.contact-band) h2')].filter((h) => { const r = h.getBoundingClientRect(); return r.top > 0 && r.bottom < innerHeight; });
+    return els.every((h) => { const fg = L(parse(getComputedStyle(h).color)); const [a, b] = [fg, bg].sort((x, y) => y - x); return (a + .05) / (b + .05) >= 3; });
+  });
+  check(contrastOk, 'headings keep at least 3:1 contrast mid-transition');
+
+  // Decorative cards move at different depths; photo wall rows move in opposite directions
+  const fin = await topOf(page, '.finishes');
+  const cardY = () => page.evaluate(() => ['.finishes__card--main', '.finishes__card--b'].map((s) => new DOMMatrixReadOnly(getComputedStyle(document.querySelector(s)).transform).m42));
+  await scrollTo(page, fin - 600); const [m1, d1] = await cardY();
+  await scrollTo(page, fin + 300); const [m2, d2] = await cardY();
+  check(Math.abs(d2 - d1) > Math.abs(m2 - m1) * 2, 'close-up finish cards rise faster than the main photo');
+  const wall = await topOf(page, '.wall');
+  const rowX = () => page.evaluate(() => ['.wall__row--a', '.wall__row--b'].map((s) => new DOMMatrixReadOnly(getComputedStyle(document.querySelector(s)).transform).m41));
+  await scrollTo(page, wall - 600); const [ra1, rb1] = await rowX();
+  await scrollTo(page, wall + 200); const [ra2, rb2] = await rowX();
+  check(ra2 < ra1 && rb2 > rb1, 'photo wall rows slide in opposite directions with scroll');
+
+  // Native scrolling
   await scrollTo(page, 0);
-  const a0 = await probe();
-  await scrollTo(page, 270);
-  const a1 = await probe();
-  check(a1.stageTop === 0, 'photo holds in view during the opening scroll');
-  check(a1.servicesTop < a0.servicesTop && a1.servicesTop < vh, `next section rises over the photo (${a0.servicesTop}px → ${a1.servicesTop}px)`);
-  check(a1.contentY < a0.contentY - 40, `headline moves upward (${a0.contentY} → ${a1.contentY})`);
-  const fg = a0.servicesTop - a1.servicesTop; const bg = Math.abs((a1.stageTop + a1.imgY) - (a0.stageTop + a0.imgY));
-  check(bg < fg * 0.5, `photo moves slower than the foreground (photo ${bg}px vs section ${fg}px)`);
-  await scrollTo(page, 900);
-  const a2 = await probe();
-  const sheetTransform = await page.$eval('.sheet', (e) => new DOMMatrixReadOnly(getComputedStyle(e).transform).a);
-  check(Math.abs(sheetTransform - 1) < 0.001, 'services sheet fully settled after the opening scene');
-  // reverse
-  await scrollTo(page, 270);
-  const b1 = await probe();
-  check(Math.abs(b1.imgY - a1.imgY) < 1 && Math.abs(b1.contentY - a1.contentY) < 1 && b1.servicesTop === a1.servicesTop, 'scrolling back reverses the scene exactly');
-  await scrollTo(page, 0);
-  const b0 = await probe();
-  check(Math.abs(b0.contentY - a0.contentY) < 1 && Math.abs(b0.imgScale - a0.imgScale) < 0.001, 'scene returns to its starting state at the top');
-  check(a2.y === 900, 'no scroll trapping while passing the opening scene');
-
-  // Native wheel & keyboard scrolling, no snapping
   await page.mouse.move(700, 450);
-  await page.mouse.wheel(0, 600);
+  await page.mouse.wheel(0, 700);
   await settle(page);
-  const yWheel = await page.evaluate(() => scrollY);
-  check(yWheel > 300, `mouse wheel scrolls the page (${yWheel}px)`);
-  await sleep(700);
-  check((await page.evaluate(() => scrollY)) === yWheel, 'no forced snapping after wheel scroll');
-  await page.mouse.wheel(0, -600);
-  await settle(page);
-  check((await page.evaluate(() => scrollY)) < yWheel, 'wheel scrolling upward works');
-  await page.focus('body');
-  await page.keyboard.press('PageDown');
-  await settle(page);
-  check((await page.evaluate(() => scrollY)) > 0, 'keyboard PageDown scrolls');
+  const yw = await page.evaluate(() => scrollY);
+  check(yw > 300, `mouse wheel scrolls normally (${yw}px)`);
+  await sleep(600);
+  check((await page.evaluate(() => scrollY)) === yw, 'no snapping or scroll trapping');
+
+  // Hover effects
   await scrollTo(page, 0);
+  const btn = page.locator('.hero-actions .btn').first();
+  const before = await btn.evaluate((b) => getComputedStyle(b).transform);
+  await btn.hover(); await sleep(450);
+  const after = await btn.evaluate((b) => getComputedStyle(b).transform);
+  check(before !== after, 'buttons lift on hover');
+  await scrollTo(page, (await topOf(page, '.service-cards')) - 100);
+  const card = page.locator('.service-card').first();
+  const box = await card.boundingBox();
+  await page.mouse.move(box.x + box.width * 0.85, box.y + box.height * 0.2, { steps: 4 }); await sleep(200);
+  check(await card.evaluate((c) => getComputedStyle(c).transform !== 'none' && c.style.getPropertyValue('--ry') !== '0deg'), 'service cards tilt in 3D under the pointer');
 
-  // Hero buttons usable through the scene
-  await scrollTo(page, 200);
-  await page.click('.hero__actions a:has-text("View projects")');
-  await settle(page);
-  const pv = await headingVisibleBelowHeader(page, '#projects');
-  check(pv.ok, `"View projects" lands with heading visible (heading ${pv.top}px, header ${pv.headerBottom}px)`);
-  await scrollTo(page, 0);
-  await page.click('.hero__actions a:has-text("Request a quote")');
-  await settle(page);
-  const qv = await headingVisibleBelowHeader(page, '#contact');
-  check(qv.ok, `"Request a quote" leads to the contact section (${qv.top}px)`);
+  // Quote buttons and contact links
+  const hrefs = await page.$$eval('.contact-band a', (a) => a.map((x) => x.getAttribute('href')));
+  for (const h of ['tel:+61424740100', 'https://wa.me/61424740100', 'mailto:adpaintingdecorating@gmail.com']) check(hrefs.includes(h), `contact link ${h}`);
+  check(await page.$$eval('.hero .hero-actions a', (a) => a.map((x) => x.getAttribute('href')).join()) === '/contact/,/projects/', 'hero actions go to Contact and Projects');
+  check((await page.$$eval('.social a', (a) => a.map((x) => x.getAttribute('href')))).every((h) => h === '/'), 'social icons point to / until profile links are supplied');
 
-  // Header navigation links
-  for (const id of ['services', 'projects', 'about', 'contact']) {
-    await scrollTo(page, 0);
-    await page.click(`.site-nav__list a[href="#${id}"]`);
-    await settle(page);
-    const r = await headingVisibleBelowHeader(page, `#${id}`);
-    check(r.ok, `nav "${id}" lands with heading below header (${r.top}px vs ${r.headerBottom}px)`);
-  }
-  // Header quote action works from deep in the page
-  await page.click('.site-header__quote');
-  await settle(page);
-  check((await headingVisibleBelowHeader(page, '#contact')).ok, 'header "Request a quote" works');
-
-  // Services: sticky photo and active service
-  const servicesTop = await page.evaluate(() => document.querySelector('.services__list').getBoundingClientRect().top + scrollY);
-  const timberTop = await page.evaluate(() => document.querySelector('[data-service="3"]').getBoundingClientRect().top + scrollY);
-  await scrollTo(page, timberTop - 300);
-  await sleep(300);
-  const sticky = await page.evaluate(() => {
-    const r = document.querySelector('.services__visual').getBoundingClientRect();
-    return { top: Math.round(r.top), active: document.querySelector('.services__pic.is-active').dataset.servicePic };
-  });
-  check(sticky.top > 60 && sticky.top < 120, `service photo stays in view (${sticky.top}px from top)`);
-  check(sticky.active === '3', `photo follows the service being read (active ${sticky.active})`);
-  check(servicesTop > 0, 'services list rendered');
-
-  // Decorative finishes: detail rises faster than the wide view
-  const finTop = await page.evaluate(() => document.getElementById('finishes').getBoundingClientRect().top + scrollY);
-  const layerY = () => page.evaluate(() => ['.finishes__wide', '.finishes__detail'].map((s) => new DOMMatrixReadOnly(getComputedStyle(document.querySelector(s)).transform).m42));
-  await scrollTo(page, finTop - 700);
-  const [w1, d1] = await layerY();
-  await scrollTo(page, finTop + 100);
-  const [w2, d2] = await layerY();
-  check(Math.abs(d2 - d1) > Math.abs(w2 - w1) * 2, `close-up moves faster than wide view (${(d1 - d2).toFixed(0)}px vs ${(w1 - w2).toFixed(0)}px extra)`);
-  check(await page.locator('.finishes__note').isVisible(), 'illustrative textures are labelled as such');
-
-  // Lightbox
-  await scrollTo(page, await page.evaluate(() => document.querySelector('.gallery').getBoundingClientRect().top + scrollY - 200));
-  const opener = page.locator('.gallery [data-shot]').first();
-  await opener.focus();
-  await page.keyboard.press('Enter');
-  await sleep(300);
-  check(await page.$eval('[data-lightbox]', (d) => d.open), 'photo opens enlarged (keyboard)');
-  await page.waitForFunction(() => document.querySelector('[data-lightbox-img]').naturalWidth > 0);
-  const lb = await page.evaluate(() => ({
-    src: document.querySelector('[data-lightbox-img]').currentSrc,
-    cap: document.querySelector('[data-lightbox-caption]').textContent,
-    count: document.querySelector('[data-lightbox-count]').textContent,
-    w: document.querySelector('[data-lightbox-img]').getBoundingClientRect().width,
-  }));
-  check(lb.src.includes('weatherboard-in-progress-2000') && lb.w > 900, `enlarged image is the large version (${Math.round(lb.w)}px wide)`);
-  check(lb.cap.includes('Weatherboard'), 'enlarged photo has its caption');
-  await page.keyboard.press('ArrowRight');
-  check((await page.textContent('[data-lightbox-count]')).startsWith('6 /'), 'arrow key moves to the next photo');
-  await page.keyboard.press('Escape');
-  await sleep(200);
-  check(!(await page.$eval('[data-lightbox]', (d) => d.open)), 'Escape closes the enlarged photo');
-  check(await page.evaluate(() => document.activeElement === document.querySelector('.gallery [data-shot]')), 'focus returns to the photo that was opened');
-  await page.click('.pair [data-shot] >> nth=1');
-  await sleep(200);
-  check(await page.$eval('[data-lightbox]', (d) => d.open), 'before/after photos open with a click');
-  await page.click('[data-lightbox-close]');
-  await sleep(200);
-  check(await page.evaluate(() => document.activeElement === document.querySelectorAll('.pair [data-shot]')[1]), 'close button returns focus to the opened photo');
-  const pairs = await page.$$eval('.pair', (els) => els.map((e) => [e.querySelector('h3').textContent.trim(), !!e.querySelector('.label:not(.label--after)'), !!e.querySelector('.label--after')]));
-  check(pairs.length === 2 && pairs.every(([, b, a]) => b && a), `before/after projects labelled (${pairs.map((p) => p[0]).join(', ')})`);
-
-  // Before/after projects assemble with scroll and reverse
-  const pairState = () => page.$eval('.pair--portrait', (el) => {
-    const m = (s) => new DOMMatrixReadOnly(getComputedStyle(el.querySelector(s)).transform);
-    const b = m('.pair__item--before'), a = m('.pair__item--after');
-    return { bx: Math.round(b.m41), ay: Math.round(a.m42), by: Math.round(b.m42), clip: getComputedStyle(el.querySelector('.pair__item--after img')).clipPath };
-  });
-  const pTop = await page.evaluate(() => document.querySelector('.pair--portrait').getBoundingClientRect().top + scrollY);
-  await scrollTo(page, pTop - 800);
-  const e1 = await pairState();
-  await scrollTo(page, pTop - 150);
-  const e2 = await pairState();
-  check(e1.bx < -20 && e1.ay > e1.by && e2.bx === 0 && e2.ay === 0, `photos swing in and settle (before x ${e1.bx}→${e2.bx}px, after rises ${e1.ay}px)`);
-  check(e1.clip.includes('%') && !/inset\(0px 0px 0px 0%\)|^none$/.test(e1.clip) && /0%\)|none/.test(e2.clip), `after photo wipes into view (${e1.clip} → ${e2.clip})`);
-  await scrollTo(page, pTop - 800);
-  const e3 = await pairState();
-  check(e3.bx === e1.bx && e3.ay === e1.ay, 'scrolling back reverses the before/after animation');
-
-  // Contact links
-  const hrefs = await page.$$eval('#contact a', (as) => as.map((a) => a.getAttribute('href')));
-  for (const h of ['tel:+61424740100', 'https://wa.me/61424740100', 'mailto:adpaintingdecorating@gmail.com', 'https://share.google/Tq917jS7W9hm3iNKE']) {
-    check(hrefs.includes(h), `contact link ${h}`);
-  }
-  check((await page.textContent('#contact')).includes('0424 740 100'), 'phone number displayed');
-  for (const name of ['Call Aaron', 'WhatsApp Aaron', 'Email Aaron', 'Get directions']) {
-    check(await page.locator('#contact a', { hasText: name }).isVisible(), `"${name}" visible`);
-  }
-
-  // Footer social links from config
-  const social = await page.$$eval('.social a', (as) => as.map((a) => [a.getAttribute('aria-label'), a.getAttribute('href')]));
-  check(social.length === 3 && social.every(([n, h]) => n && h === '/'), `social icons point to / (${social.map((s) => s[0]).join(', ')})`);
-
-  // Focus visibility
-  await page.reload({ waitUntil: 'networkidle' });
+  // Keyboard
+  await page.reload({ waitUntil: 'load' });
   await page.keyboard.press('Tab');
-  check(await page.evaluate(() => document.activeElement.classList.contains('skip-link') && document.activeElement.getBoundingClientRect().top >= 0), 'skip link appears on first Tab');
+  check(await page.evaluate(() => document.activeElement.classList.contains('skip-link')), 'skip link is first on Tab');
   await page.keyboard.press('Tab');
-  const outline = await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle);
-  check(outline !== 'none', `keyboard focus is visible (outline ${outline})`);
-  const unnamed = await page.$$eval('a, button, [role="slider"]', (els) => els.filter((e) => !(e.getAttribute('aria-label') || e.textContent.trim())).length);
-  check(unnamed === 0, 'all interactive elements have accessible names');
-
-  check(errors.length === 0, `no console errors${errors.length ? ': ' + errors.join('; ') : ''}`);
+  check(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle !== 'none'), 'keyboard focus is visible');
   await page.close();
 }
 
-async function reducedMotion(browser) {
+async function navigation(browser) {
+  console.log('\nNavigation');
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await page.goto(SITE + '/services/house-painting/', { waitUntil: 'load' });
+  check(await page.getAttribute('.site-nav__list a[href="/services/"]', 'aria-current') === 'page', 'current section highlighted in the header');
+  await page.click('.submenu-toggle');
+  check(await page.locator('#services-menu a').first().isVisible(), 'services dropdown opens');
+  check((await page.$$eval('#services-menu a', (a) => a.length)) === 6, 'dropdown lists all six services');
+  await page.keyboard.press('Escape');
+  await page.mouse.move(10, 600);
+  await sleep(350);
+  check(!(await page.locator('#services-menu').evaluate((e) => e.classList.contains('is-open'))) && (await page.evaluate(() => document.activeElement.classList.contains('submenu-toggle'))), 'Escape closes the dropdown and returns focus');
+  await page.click('.site-header__quote');
+  await page.waitForURL('**/contact/');
+  check(true, 'header "Request a quote" opens the Contact page');
+  await page.close();
+
+  const ctx = await browser.newContext({ ...devices['iPhone 13'] });
+  const m = await ctx.newPage();
+  await m.goto(SITE + '/', { waitUntil: 'load' });
+  await m.tap('[data-nav-toggle]'); await sleep(300);
+  check(await m.locator('.site-nav__quote a').isVisible(), 'mobile menu opens with a quote action');
+  await m.tap('.submenu-toggle'); await sleep(200);
+  check(await m.locator('#services-menu a[href="/services/timber-restoration/"]').isVisible(), 'mobile menu expands the services list');
+  await m.tap('#services-menu a[href="/services/timber-restoration/"]');
+  await m.waitForURL('**/services/timber-restoration/');
+  check((await m.textContent('h1')).includes('Timber restoration'), 'service page opens from the mobile menu');
+  await m.tap('[data-nav-toggle]'); await sleep(250);
+  await m.keyboard.press('Escape'); await sleep(300);
+  check(!(await m.locator('[data-nav-list]').evaluate((e) => e.classList.contains('is-open'))), 'Escape closes the mobile menu');
+  await ctx.close();
+}
+
+async function projects(browser) {
+  console.log('\nProjects page');
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await page.goto(SITE + '/projects/', { waitUntil: 'load' });
+  check((await page.locator('.pair').count()) === 13, '13 before & after projects');
+  check((await page.locator('.pair .label').count()) === 26, 'every project labelled Before and After');
+  check((await page.locator('main figcaption, .gallery__caption').count()) === 0, 'photos are shown without explanatory captions');
+
+  // Slider keyboard
+  const handle = page.locator('.compare__handle');
+  await handle.focus();
+  await page.keyboard.press('ArrowRight');
+  check((await handle.getAttribute('aria-valuenow')) === '52', 'slider moves with arrow keys');
+  await page.keyboard.press('Home');
+  check((await handle.getAttribute('aria-valuenow')) === '0', 'Home key moves slider to start');
+
+  // Pair animation reverses
+  const sel = '.pair:nth-child(3)';
+  const st = () => page.$eval(sel, (el) => Math.round(new DOMMatrixReadOnly(getComputedStyle(el.querySelector('.pair__item--before')).transform).m41));
+  const t = await topOf(page, sel);
+  await scrollTo(page, t - 850); const x1 = await st();
+  await scrollTo(page, t - 120); const x2 = await st();
+  await scrollTo(page, t - 850); const x3 = await st();
+  check(x1 < -20 && x2 === 0 && Math.abs(x3 - x1) <= 3, `before/after photos swing in, settle and reverse (${x1} → ${x2} → ${x3}px)`);
+
+  // Filters + lightbox
+  await scrollTo(page, (await topOf(page, '#gallery')) - 80);
+  await page.click('[data-filter="Timber"]');
+  const vis = await page.$$eval('[data-gallery] [data-tag]', (els) => els.filter((e) => e.offsetParent).map((e) => e.dataset.tag));
+  check(vis.length > 0 && vis.every((t) => t === 'Timber'), `filter shows only matching photos (${vis.length} timber)`);
+  await page.click('[data-filter="All"]');
+  const shot = page.locator('[data-gallery] [data-shot]').first();
+  await shot.focus();
+  await page.keyboard.press('Enter'); await sleep(300);
+  check(await page.$eval('[data-lightbox]', (d) => d.open), 'photo opens larger');
+  await page.waitForFunction(() => document.querySelector('[data-lightbox-img]').naturalWidth > 0);
+  const c1 = await page.textContent('[data-lightbox-count]');
+  await page.keyboard.press('ArrowRight');
+  const c2 = await page.textContent('[data-lightbox-count]');
+  check(c1 !== c2, `arrow keys move through photos (${c1} → ${c2})`);
+  await page.keyboard.press('Escape'); await sleep(200);
+  check(!(await page.$eval('[data-lightbox]', (d) => d.open)) && (await page.evaluate(() => document.activeElement === document.querySelector('[data-gallery] [data-shot]'))), 'Escape closes and focus returns to the photo');
+  await page.close();
+
+  // Touch behaviour of the slider
+  const ctx = await browser.newContext({ ...devices['iPhone 13'] });
+  const m = await ctx.newPage();
+  await m.goto(SITE + '/projects/', { waitUntil: 'load' });
+  await m.locator('.compare').evaluate((e) => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await settle(m);
+  const cdp = await ctx.newCDPSession(m);
+  let b = await m.locator('.compare__frame').boundingBox();
+  const y0 = await m.evaluate(() => scrollY);
+  await touchSwipe(cdp, b.x + b.width / 2, b.y + b.height / 2, 5, -250);
+  await settle(m);
+  check((await m.evaluate(() => scrollY)) > y0 + 80 && (await m.getAttribute('.compare__handle', 'aria-valuenow')) === '50', 'vertical swipe on the slider scrolls the page without moving it');
+  await m.locator('.compare').evaluate((e) => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await settle(m);
+  b = await m.locator('.compare__frame').boundingBox();
+  await touchSwipe(cdp, b.x + b.width * 0.8, b.y + b.height / 2, -200, 4);
+  await sleep(150);
+  check(Number(await m.getAttribute('.compare__handle', 'aria-valuenow')) < 50, 'horizontal drag moves the slider on touch');
+  await ctx.close();
+}
+
+async function contact(browser) {
+  console.log('\nContact page & quote form');
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.goto(SITE + '/contact/', { waitUntil: 'load' });
+  const hrefs = await page.$$eval('.contact-list a', (a) => a.map((x) => x.getAttribute('href')));
+  check(JSON.stringify(hrefs) === JSON.stringify(['tel:+61424740100', 'https://wa.me/61424740100', 'mailto:adpaintingdecorating@gmail.com', 'https://share.google/Tq917jS7W9hm3iNKE']), 'call, WhatsApp, email and directions links are exact');
+  check((await page.textContent('main')).includes('26 Wettenhall Circuit') && (await page.textContent('main')).includes('Calwell ACT 2905'), 'address shown');
+  check(await page.locator('iframe.map-card__frame').getAttribute('src').then((s) => s.includes('Wettenhall')), 'map embedded for the business address');
+  await page.evaluate(() => { window.__opened = null; window.open = (u) => { window.__opened = u; }; });
+  await page.click('button[value="whatsapp"]');
+  check(await page.isVisible('[data-form-error]'), 'form asks for missing details');
+  await page.fill('#q-name', 'Sam');
+  await page.fill('#q-phone', '0400 000 000');
+  await page.selectOption('#q-service', { index: 4 });
+  await page.fill('#q-message', 'Deck needs restoring & oiling');
+  await page.click('button[value="whatsapp"]');
+  const opened = await page.evaluate(() => window.__opened);
+  check(opened?.startsWith('https://wa.me/61424740100?text=') && decodeURIComponent(opened).includes('Name: Sam') && decodeURIComponent(opened).includes('restoring & oiling'), 'WhatsApp message prepared with the form details');
+  const mail = await page.evaluate(() => { const f = document.querySelector('[data-quote-form]'); const b = f.querySelector('button[value="email"]'); window.location.assign = () => {}; f.requestSubmit(b); return f.dataset.lastUrl; });
+  check(mail.startsWith('mailto:adpaintingdecorating@gmail.com?subject=') && decodeURIComponent(mail).includes('Timber restoration'), 'email prepared with subject and details');
+  await page.close();
+}
+
+async function reduced(browser) {
   console.log('\nReduced motion');
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   const page = await ctx.newPage();
-  await page.goto(SITE, { waitUntil: 'networkidle' });
-  check(!(await page.evaluate(() => document.documentElement.classList.contains('motion'))), 'motion layer disabled');
+  await page.goto(SITE + '/', { waitUntil: 'load' });
   const r = await page.evaluate(() => ({
-    hero: document.querySelector('.hero').offsetHeight,
-    stage: document.querySelector('.hero__stage').offsetHeight,
-    img: getComputedStyle(document.querySelector('.hero__img')).transform,
+    motion: document.documentElement.classList.contains('motion'),
+    hold: document.querySelector('.hero').offsetHeight - document.querySelector('.hero__stage').offsetHeight,
+    t: getComputedStyle(document.querySelector('.hero__media')).transform,
+    secs: document.querySelectorAll('main > section').length,
   }));
-  check(r.hero === r.stage, 'no scroll hold in the opening scene');
-  check(r.img === 'none', 'photos are not transformed');
-  await scrollTo(page, 3000);
-  const t = await page.$$eval('.finishes__detail, .finishes__wide, .service > *', (els) => els.every((e) => getComputedStyle(e).transform === 'none'));
-  check(t, 'decorative and service content sit in a stable layout');
-  check(await page.locator('.service').count() === 6 && await page.locator('[data-shot]').count() === 6, 'same content present');
+  check(!r.motion && r.hold === 0 && r.t === 'none', 'no scroll effects, hold or transforms');
+  check(r.secs >= 10, `same long homepage content (${r.secs} sections)`);
+  await page.goto(SITE + '/projects/', { waitUntil: 'load' });
+  check(await page.$$eval('.pair__item', (els) => els.every((e) => getComputedStyle(e).transform === 'none')), 'before/after photos sit still');
   await ctx.close();
 }
 
-async function mobile(browser) {
-  console.log('\nMobile (iPhone 13)');
-  const ctx = await browser.newContext({ ...devices['iPhone 13'] });
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(SITE, { waitUntil: 'networkidle' });
-  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal scroll');
-  check(await page.locator('.hero__actions a', { hasText: 'Request a quote' }).isVisible(), 'hero quote button visible');
-  const heroBox = await page.locator('.hero__title').boundingBox();
-  check(heroBox.x >= 15, `hero text keeps the side gutter (${heroBox.x.toFixed(0)}px)`);
-
-  // Touch scrolling through the scene and back
-  const cdp = await ctx.newCDPSession(page);
-  const swipe = (x, y, dx, dy) => touchSwipe(cdp, x, y, dx, dy);
-  await swipe(195, 500, 0, -500);
-  await settle(page);
-  const y1 = await page.evaluate(() => scrollY);
-  const hold1 = await page.evaluate(() => +getComputedStyle(document.querySelector('.hero')).getPropertyValue('--hold'));
-  check(y1 > 200, `touch swipe scrolls the page (${y1}px)`);
-  check(hold1 > 0.2, `scene follows touch scroll (progress ${hold1.toFixed(2)})`);
-  await swipe(195, 300, 0, 500);
-  await settle(page);
-  const hold0 = await page.evaluate(() => +getComputedStyle(document.querySelector('.hero')).getPropertyValue('--hold'));
-  check((await page.evaluate(() => scrollY)) < y1 && hold0 < hold1, 'scene reverses when swiping back up');
-
-  // Menu
-  await scrollTo(page, 0);
-  await page.tap('[data-nav-toggle]');
-  await sleep(300);
-  check(await page.locator('[data-nav-list] a[href="#services"]').isVisible(), 'menu opens');
-  check(await page.locator('.site-nav__quote a').isVisible(), 'menu includes "Request a quote"');
-  await page.keyboard.press('Escape');
-  await sleep(300);
-  check(!(await page.locator('[data-nav-list] a[href="#services"]').isVisible()), 'Escape closes the menu');
-  check(await page.evaluate(() => document.activeElement.matches('[data-nav-toggle]')), 'focus returns to menu button');
-  for (const id of ['services', 'projects', 'about', 'contact']) {
-    await scrollTo(page, 0);
-    await page.tap('[data-nav-toggle]');
-    await sleep(300);
-    await page.tap(`[data-nav-list] a[href="#${id}"]`);
-    await settle(page);
-    const r = await headingVisibleBelowHeader(page, `#${id}`);
-    check(r.ok, `menu "${id}" lands with heading visible (${r.top}px vs ${r.headerBottom}px)`);
-    check(!(await page.locator('[data-nav-list]').evaluate((e) => e.classList.contains('is-open'))), `menu closes after choosing "${id}"`);
-  }
-  // Lightbox on touch
-  await page.locator('.gallery [data-shot]').nth(1).scrollIntoViewIfNeeded();
-  await page.locator('.gallery [data-shot]').nth(1).tap();
-  await sleep(300);
-  const fits = await page.evaluate(() => { const r = document.querySelector('[data-lightbox-img]').getBoundingClientRect(); return r.width <= innerWidth && r.height <= innerHeight; });
-  check(await page.$eval('[data-lightbox]', (d) => d.open) && fits, 'enlarged photo fits the phone screen');
-  await page.tap('[data-lightbox-next]');
-  check((await page.textContent('[data-lightbox-count]')).startsWith('1 /'), 'next button wraps around the gallery');
-  await page.tap('[data-lightbox-close]');
-  await sleep(200);
-  check(!(await page.$eval('[data-lightbox]', (d) => d.open)), 'close button closes the photo');
-  check(errors.length === 0, 'no page errors');
-  await ctx.close();
-}
-
-async function compareFixture(browser) {
-  console.log('\nBefore/after slider (fixture)');
-  const ctx = await browser.newContext({ ...devices['iPhone 13'] });
-  const page = await ctx.newPage();
-  await page.goto(`${DEV}/tests/fixtures/compare.html`, { waitUntil: 'networkidle' });
-  const handle = page.locator('.compare__handle');
-  const val = () => handle.getAttribute('aria-valuenow').then(Number);
-  await handle.focus();
-  await page.keyboard.press('ArrowRight');
-  check((await val()) === 52, 'Arrow Right moves the divider');
-  await page.keyboard.press('Home');
-  check((await val()) === 0, 'Home moves divider to the start');
-  await page.keyboard.press('End');
-  check((await val()) === 100, 'End moves divider to the end');
-  await page.keyboard.press('PageDown');
-  check((await val()) === 90, 'Page Down moves in larger steps');
-  const clip = await page.$eval('.compare__before', (e) => getComputedStyle(e).clipPath);
-  check(clip.includes('10%'), `before photo clipped to the divider (${clip})`);
-  check(await page.locator('.compare .label', { hasText: 'Before' }).isVisible() && await page.locator('.compare .label', { hasText: 'After' }).isVisible(), 'Before/After labels visible');
-
-  await page.locator('.compare').scrollIntoViewIfNeeded();
-  await settle(page);
-  const box = await page.locator('.compare__frame').boundingBox();
-  const cdp = await ctx.newCDPSession(page);
-  // Vertical swipe starting on the photo scrolls the page and leaves the divider alone.
-  const before = await val();
-  const y0 = await page.evaluate(() => scrollY);
-  await touchSwipe(cdp, box.x + box.width / 2, box.y + box.height / 2, 6, -300);
-  await settle(page);
-  const y1 = await page.evaluate(() => scrollY);
-  check(y1 > y0 + 100, `vertical swipe on the slider still scrolls the page (${y1 - y0}px)`);
-  const after = await val();
-  check(Math.abs(after - before) <= 3, `vertical swipe leaves the divider in place (${before}% → ${after}%)`);
-  // Horizontal touch drag moves the divider.
-  await page.locator('.compare').evaluate((e) => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
-  await settle(page);
-  const box2 = await page.locator('.compare__frame').boundingBox();
-  await touchSwipe(cdp, box2.x + box2.width * 0.8, box2.y + box2.height / 2, -220, 4);
-  await sleep(200);
-  const dragged = await val();
-  check(dragged < 60, `horizontal touch drag moves the divider (now ${dragged}%)`);
-  await ctx.close();
-
-  // Mouse drag on desktop
-  const page2 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  await page2.goto(`${DEV}/tests/fixtures/compare.html`, { waitUntil: 'networkidle' });
-  await page2.locator('.compare').scrollIntoViewIfNeeded();
-  const b = await page2.locator('.compare__frame').boundingBox();
-  await page2.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
-  await page2.mouse.down();
-  await page2.mouse.move(b.x + b.width * 0.25, b.y + b.height / 2, { steps: 8 });
-  await page2.mouse.up();
-  const v = Number(await page2.locator('.compare__handle').getAttribute('aria-valuenow'));
-  check(v >= 23 && v <= 27, `mouse drag moves the divider (${v}%)`);
-  await page2.close();
-}
-
-const preview = await serve(['preview', '--port', '4317', '--strictPort'], SITE);
-const dev = await serve(['--port', '4318', '--strictPort'], DEV);
+const server = spawn('npx', ['vite', 'preview', '--port', '4317', '--strictPort'], { stdio: 'ignore' });
+for (let i = 0; i < 60; i++) { try { if ((await fetch(SITE)).ok) break; } catch {} await sleep(250); }
 const browser = await chromium.launch();
 try {
-  await desktop(browser);
-  await reducedMotion(browser);
-  await mobile(browser);
-  await compareFixture(browser);
+  await crawl(browser);
+  await mobileCrawl(browser);
+  await home(browser);
+  await navigation(browser);
+  await projects(browser);
+  await contact(browser);
+  await reduced(browser);
 } catch (e) {
   failures++;
   console.error(e);
 } finally {
   await browser.close();
-  preview.kill();
-  dev.kill();
+  server.kill();
 }
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

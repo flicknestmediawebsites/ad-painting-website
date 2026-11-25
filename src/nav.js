@@ -1,6 +1,8 @@
 export function initNav() {
   const toggle = document.querySelector('[data-nav-toggle]');
   const list = document.querySelector('[data-nav-list]');
+  const subToggle = document.querySelector('.submenu-toggle');
+  const submenu = document.getElementById('services-menu');
   if (!toggle || !list) return;
 
   const setOpen = (open, { focusToggle = false } = {}) => {
@@ -9,34 +11,38 @@ export function initNav() {
     list.classList.toggle('is-open', open);
     if (focusToggle) toggle.focus();
   };
+  const setSub = (open) => {
+    if (!subToggle || !submenu) return;
+    subToggle.setAttribute('aria-expanded', String(open));
+    submenu.classList.toggle('is-open', open);
+  };
 
   toggle.addEventListener('click', () => setOpen(toggle.getAttribute('aria-expanded') !== 'true'));
-  list.addEventListener('click', (e) => e.target.closest('a') && setOpen(false));
+  subToggle?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setSub(subToggle.getAttribute('aria-expanded') !== 'true');
+  });
+  list.addEventListener('click', (e) => {
+    if (e.target.closest('a')) {
+      setOpen(false);
+      setSub(false);
+    }
+  });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && list.classList.contains('is-open')) setOpen(false, { focusToggle: true });
+    if (e.key !== 'Escape') return;
+    if (submenu?.classList.contains('is-open')) {
+      setSub(false);
+      subToggle.focus();
+    } else if (list.classList.contains('is-open')) setOpen(false, { focusToggle: true });
   });
   document.addEventListener('click', (e) => {
-    if (list.classList.contains('is-open') && !e.target.closest('.site-nav')) setOpen(false);
+    if (!e.target.closest('.site-nav')) {
+      setOpen(false);
+      setSub(false);
+    }
   });
-  window.matchMedia('(min-width: 860px)').addEventListener?.('change', () => setOpen(false));
-
-  // Mark the nav link for the section currently in view (none over the opening scene).
-  const links = [...list.querySelectorAll('a[href^="#"]:not([data-no-current])')];
-  const sections = links.map((a) => document.querySelector(a.getAttribute('href')));
-  let queued = false;
-  const update = () => {
-    queued = false;
-    const line = window.innerHeight * 0.4;
-    let current = -1;
-    sections.forEach((s, i) => {
-      if (s && s.getBoundingClientRect().top <= line) current = i;
-    });
-    links.forEach((a, i) => (i === current ? a.setAttribute('aria-current', 'true') : a.removeAttribute('aria-current')));
-  };
-  const request = () => {
-    if (!queued) { queued = true; requestAnimationFrame(update); }
-  };
-  window.addEventListener('scroll', request, { passive: true });
-  window.addEventListener('resize', request);
-  update();
+  window.matchMedia('(min-width: 900px)').addEventListener?.('change', () => {
+    setOpen(false);
+    setSub(false);
+  });
 }

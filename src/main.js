@@ -1,14 +1,16 @@
 import './styles.css';
-import { initMotion, initServices } from './motion.js';
+import { initMotion, initTilt } from './motion.js';
 import { initNav } from './nav.js';
 import { initLightbox } from './lightbox.js';
 import { initCompare } from './compare.js';
+import { initFilters, initQuoteForm } from './forms.js';
 
 initNav();
 initMotion();
-initServices();
+initTilt();
 initLightbox();
 initCompare();
+initFilters();
+initQuoteForm();
 
-const year = document.querySelector('[data-year]');
-if (year) year.textContent = String(new Date().getFullYear());
+document.querySelectorAll('[data-year]').forEach((el) => (el.textContent = String(new Date().getFullYear())));

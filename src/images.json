@@ -1,59 +1,448 @@
 {
-  "brick-exterior-white": {
+  "bedroom-after": {
     "width": 656,
-    "height": 1164,
+    "height": 1082,
     "widths": [
       480,
       656
     ]
   },
-  "house-after-white": {
-    "width": 2000,
-    "height": 1126,
-    "widths": [
-      480,
-      800,
-      1200,
-      1600,
-      2000
-    ]
-  },
-  "house-before-yellow": {
-    "width": 2000,
-    "height": 1126,
-    "widths": [
-      480,
-      800,
-      1200,
-      1600,
-      2000
-    ]
-  },
-  "timber-outdoor-setting": {
+  "bedroom-before": {
     "width": 656,
-    "height": 1164,
+    "height": 1082,
     "widths": [
       480,
       656
     ]
   },
-  "timber-setting-before": {
+  "bedroom-neutral-2": {
     "width": 656,
-    "height": 1164,
+    "height": 1082,
     "widths": [
       480,
       656
     ]
   },
-  "weatherboard-in-progress": {
-    "width": 2000,
-    "height": 1126,
+  "bedroom-neutral": {
+    "width": 656,
+    "height": 1082,
     "widths": [
       480,
-      800,
-      1200,
-      1600,
-      2000
+      656
+    ]
+  },
+  "brick-home-after": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
+    ]
+  },
+  "brick-home-before": {
+    "width": 1546,
+    "height": 1164,
+    "widths": [
+      480,
+      900,
+      1400,
+      1546
+    ]
+  },
+  "brick-home-front": {
+    "width": 656,
+    "height": 1082,
+    "widths": [
+      480,
+      656
+    ]
+  },
+  "brick-home-side": {
+    "width": 656,
+    "height": 1082,
+    "widths": [
+      480,
+      656
+    ]
+  },
+  "concrete-effect-detail": {
+    "width": 1548,
+    "height": 908,
+    "widths": [
+      480,
+      900,
+      1400,
+      1548
+    ]
+  },
+  "deck-after": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
+    ]
+  },
+  "deck-before": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
+    ]
+  },
+  "dining-neutral": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
+    ]
+  },
+  "epoxy-floor": {
+    "width": 681,
+    "height": 908,
+    "widths": [
+      480,
+      681
+    ]
+  },
+  "fascia-after": {
+    "width": 1748,
+    "height": 1164,
+    "widths": [
+      480,
+      900,
+      1400,
+      1748
+    ]
+  },
+  "fascia-before": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
+    ]
+  },
+  "house-after": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
+    ]
+  },
+  "house-before": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
+    ]
+  },
+  "letterbox-after": {
+    "width": 656,
+    "height": 1082,
+    "widths": [
+      480,
+      656
+    ]
+  },
+  "letterbox-before": {
+    "width": 656,
+    "height": 1082,
+    "widths": [
+      480,
+      656
+    ]
+  },
+  "living-green-2": {
+    "width": 2400,
+    "height": 1351,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2400
+    ]
+  },
+  "living-green-3": {
+    "width": 2400,
+    "height": 1351,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2400
+    ]
+  },
+  "living-green": {
+    "width": 2400,
+    "height": 1351,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2400
+    ]
+  },
+  "living-neutral": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
+    ]
+  },
+  "marble-feature-wall-wide": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
+    ]
+  },
+  "marble-feature-wall": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
+    ]
+  },
+  "marble-swirl-detail-2": {
+    "width": 451,
+    "height": 800,
+    "widths": [
+      451
+    ]
+  },
+  "marble-swirl-detail": {
+    "width": 524,
+    "height": 1164,
+    "widths": [
+      480,
+      524
+    ]
+  },
+  "path-after": {
+    "width": 874,
+    "height": 1164,
+    "widths": [
+      480,
+      874
+    ]
+  },
+  "path-before": {
+    "width": 874,
+    "height": 1164,
+    "widths": [
+      480,
+      874
+    ]
+  },
+  "patio-floor-after": {
+    "width": 703,
+    "height": 1007,
+    "widths": [
+      480,
+      703
+    ]
+  },
+  "patio-floor-before": {
+    "width": 703,
+    "height": 1007,
+    "widths": [
+      480,
+      703
+    ]
+  },
+  "plant-room-floor-after": {
+    "width": 656,
+    "height": 1082,
+    "widths": [
+      480,
+      656
+    ]
+  },
+  "plant-room-floor-before": {
+    "width": 656,
+    "height": 1082,
+    "widths": [
+      480,
+      656
+    ]
+  },
+  "polished-plaster-detail": {
+    "width": 511,
+    "height": 609,
+    "widths": [
+      480,
+      511
+    ]
+  },
+  "rock-texture-detail-2": {
+    "width": 1613,
+    "height": 908,
+    "widths": [
+      480,
+      900,
+      1400,
+      1613
+    ]
+  },
+  "rock-texture-detail": {
+    "width": 1613,
+    "height": 908,
+    "widths": [
+      480,
+      900,
+      1400,
+      1613
+    ]
+  },
+  "stairs-after": {
+    "width": 874,
+    "height": 1164,
+    "widths": [
+      480,
+      874
+    ]
+  },
+  "stairs-before": {
+    "width": 874,
+    "height": 1164,
+    "widths": [
+      480,
+      874
+    ]
+  },
+  "stairwell-2": {
+    "width": 874,
+    "height": 1164,
+    "widths": [
+      480,
+      874
+    ]
+  },
+  "stairwell-3": {
+    "width": 874,
+    "height": 1164,
+    "widths": [
+      480,
+      874
+    ]
+  },
+  "stairwell": {
+    "width": 874,
+    "height": 1164,
+    "widths": [
+      480,
+      874
+    ]
+  },
+  "stone-effect-wall-detail": {
+    "width": 656,
+    "height": 1082,
+    "widths": [
+      480,
+      656
+    ]
+  },
+  "study-neutral": {
+    "width": 656,
+    "height": 1082,
+    "widths": [
+      480,
+      656
+    ]
+  },
+  "table-after": {
+    "width": 656,
+    "height": 1082,
+    "widths": [
+      480,
+      656
+    ]
+  },
+  "table-before": {
+    "width": 656,
+    "height": 1082,
+    "widths": [
+      480,
+      656
+    ]
+  },
+  "vanity-after": {
+    "width": 601,
+    "height": 977,
+    "widths": [
+      480,
+      601
+    ]
+  },
+  "vanity-before": {
+    "width": 601,
+    "height": 977,
+    "widths": [
+      480,
+      601
+    ]
+  },
+  "weatherboard-after": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
+    ]
+  },
+  "weatherboard-before": {
+    "width": 2068,
+    "height": 1024,
+    "widths": [
+      480,
+      900,
+      1400,
+      2000,
+      2068
     ]
   }
 }
