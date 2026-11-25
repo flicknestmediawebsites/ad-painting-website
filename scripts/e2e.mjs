@@ -216,7 +216,7 @@ async function desktop(browser) {
   check(lb.src.includes('weatherboard-in-progress-2000') && lb.w > 900, `enlarged image is the large version (${Math.round(lb.w)}px wide)`);
   check(lb.cap.includes('Weatherboard'), 'enlarged photo has its caption');
   await page.keyboard.press('ArrowRight');
-  check((await page.textContent('[data-lightbox-count]')).startsWith('4 /'), 'arrow key moves to the next photo');
+  check((await page.textContent('[data-lightbox-count]')).startsWith('6 /'), 'arrow key moves to the next photo');
   await page.keyboard.press('Escape');
   await sleep(200);
   check(!(await page.$eval('[data-lightbox]', (d) => d.open)), 'Escape closes the enlarged photo');
@@ -227,7 +227,25 @@ async function desktop(browser) {
   await page.click('[data-lightbox-close]');
   await sleep(200);
   check(await page.evaluate(() => document.activeElement === document.querySelectorAll('.pair [data-shot]')[1]), 'close button returns focus to the opened photo');
-  check(await page.locator('.pair .label', { hasText: 'Before' }).isVisible() && await page.locator('.pair .label', { hasText: 'After' }).isVisible(), 'side-by-side pair has Before/After labels');
+  const pairs = await page.$$eval('.pair', (els) => els.map((e) => [e.querySelector('h3').textContent.trim(), !!e.querySelector('.label:not(.label--after)'), !!e.querySelector('.label--after')]));
+  check(pairs.length === 2 && pairs.every(([, b, a]) => b && a), `before/after projects labelled (${pairs.map((p) => p[0]).join(', ')})`);
+
+  // Before/after projects assemble with scroll and reverse
+  const pairState = () => page.$eval('.pair--portrait', (el) => {
+    const m = (s) => new DOMMatrixReadOnly(getComputedStyle(el.querySelector(s)).transform);
+    const b = m('.pair__item--before'), a = m('.pair__item--after');
+    return { bx: Math.round(b.m41), ay: Math.round(a.m42), by: Math.round(b.m42), clip: getComputedStyle(el.querySelector('.pair__item--after img')).clipPath };
+  });
+  const pTop = await page.evaluate(() => document.querySelector('.pair--portrait').getBoundingClientRect().top + scrollY);
+  await scrollTo(page, pTop - 800);
+  const e1 = await pairState();
+  await scrollTo(page, pTop - 150);
+  const e2 = await pairState();
+  check(e1.bx < -20 && e1.ay > e1.by && e2.bx === 0 && e2.ay === 0, `photos swing in and settle (before x ${e1.bx}→${e2.bx}px, after rises ${e1.ay}px)`);
+  check(e1.clip.includes('%') && !/inset\(0px 0px 0px 0%\)|^none$/.test(e1.clip) && /0%\)|none/.test(e2.clip), `after photo wipes into view (${e1.clip} → ${e2.clip})`);
+  await scrollTo(page, pTop - 800);
+  const e3 = await pairState();
+  check(e3.bx === e1.bx && e3.ay === e1.ay, 'scrolling back reverses the before/after animation');
 
   // Contact links
   const hrefs = await page.$$eval('#contact a', (as) => as.map((a) => a.getAttribute('href')));
@@ -273,7 +291,7 @@ async function reducedMotion(browser) {
   await scrollTo(page, 3000);
   const t = await page.$$eval('.finishes__detail, .finishes__wide, .service > *', (els) => els.every((e) => getComputedStyle(e).transform === 'none'));
   check(t, 'decorative and service content sit in a stable layout');
-  check(await page.locator('.service').count() === 6 && await page.locator('[data-shot]').count() === 5, 'same content present');
+  check(await page.locator('.service').count() === 6 && await page.locator('[data-shot]').count() === 6, 'same content present');
   await ctx.close();
 }
 
@@ -324,8 +342,8 @@ async function mobile(browser) {
     check(!(await page.locator('[data-nav-list]').evaluate((e) => e.classList.contains('is-open'))), `menu closes after choosing "${id}"`);
   }
   // Lightbox on touch
-  await page.locator('.gallery [data-shot]').nth(2).scrollIntoViewIfNeeded();
-  await page.locator('.gallery [data-shot]').nth(2).tap();
+  await page.locator('.gallery [data-shot]').nth(1).scrollIntoViewIfNeeded();
+  await page.locator('.gallery [data-shot]').nth(1).tap();
   await sleep(300);
   const fits = await page.evaluate(() => { const r = document.querySelector('[data-lightbox-img]').getBoundingClientRect(); return r.width <= innerWidth && r.height <= innerHeight; });
   check(await page.$eval('[data-lightbox]', (d) => d.open) && fits, 'enlarged photo fits the phone screen');

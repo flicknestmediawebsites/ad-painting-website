@@ -184,59 +184,84 @@
             <p class="eyebrow">Projects</p>
             <h2 class="section-title" id="projects-title">Recent work</h2>
           </div>
-          <p class="section-intro">Painted surfaces, restored timber and work in progress. Select a photo to see it larger.</p>
+          <p class="section-intro">Before and after, painted surfaces and restored timber. Select a photo to see it larger.</p>
         </header>
 
-        <article class="pair" aria-labelledby="pair-title" data-reveal>
-          <div class="pair__head">
-            <h3 id="pair-title">Single-storey home repaint</h3>
-            <p>The same home before and after, photographed from slightly different angles.</p>
-          </div>
-          <div class="pair__grid">
-            <figure class="pair__item">
-              <button class="shot" type="button" data-shot data-full="{{full:house-before-yellow}}" data-w="{{w:house-before-yellow}}" data-h="{{h:house-before-yellow}}"
-                      data-caption="Before: yellow walls with dark trim and roller doors." aria-label="Enlarge before photo: yellow walls with dark trim and roller doors">
-                <x-img name="house-before-yellow" sizes="(min-width: 960px) 46vw, 100vw" alt="The home before painting, with yellow walls"></x-img>
-                <span class="label">Before</span>
-              </button>
-              <figcaption>Yellow walls with dark trim and roller doors.</figcaption>
-            </figure>
-            <figure class="pair__item">
-              <button class="shot" type="button" data-shot data-full="{{full:house-after-white}}" data-w="{{w:house-after-white}}" data-h="{{h:house-after-white}}"
-                      data-caption="After: walls repainted white, with dark fascia, gutters and roller doors." aria-label="Enlarge after photo: walls repainted white, with dark fascia, gutters and roller doors">
-                <x-img name="house-after-white" sizes="(min-width: 960px) 46vw, 100vw" alt="The same home after painting, with white walls"></x-img>
-                <span class="label label--after">After</span>
-              </button>
-              <figcaption>Walls repainted white, with dark fascia, gutters and roller doors.</figcaption>
-            </figure>
-          </div>
-        </article>
+        <!-- BEFORE & AFTER PROJECTS
+             Each <article class="pair"> is one job. Use pair--portrait for upright photos.
+             Photos taken from the same position can use the draggable slider instead:
+             see tests/fixtures/compare.html. -->
+        <div class="pairs">
+          <article class="pair pair--portrait" aria-labelledby="pair-timber-title" data-scene>
+            <div class="pair__head">
+              <span class="pair__num" aria-hidden="true">01</span>
+              <h3 id="pair-timber-title">Timber outdoor setting</h3>
+              <p>A weathered timber table sanded back and restored to a rich, warm finish.</p>
+              <p class="pair__note">Photographed from opposite ends of the deck.</p>
+            </div>
+            <div class="pair__grid">
+              <figure class="pair__item pair__item--before">
+                <button class="shot" type="button" data-shot data-full="{{full:timber-setting-before}}" data-w="{{w:timber-setting-before}}" data-h="{{h:timber-setting-before}}"
+                        data-caption="Before: weathered, greyed timber partway through sanding." aria-label="Enlarge before photo: weathered timber table partway through sanding">
+                  <x-img name="timber-setting-before" sizes="(min-width: 960px) 26vw, 50vw" alt="Weathered, greyed timber table with sanding belts on top, partway through sanding"></x-img>
+                  <span class="label">Before</span>
+                </button>
+                <figcaption>Weathered, greyed timber partway through sanding.</figcaption>
+              </figure>
+              <figure class="pair__item pair__item--after">
+                <button class="shot" type="button" data-shot data-full="{{full:timber-outdoor-setting}}" data-w="{{w:timber-outdoor-setting}}" data-h="{{h:timber-outdoor-setting}}"
+                        data-caption="After: table and chairs restored to a rich, warm timber finish." aria-label="Enlarge after photo: restored timber table and chairs">
+                  <x-img name="timber-outdoor-setting" sizes="(min-width: 960px) 26vw, 50vw" alt="The same timber table and folding chairs after restoration, with a rich, warm finish"></x-img>
+                  <span class="label label--after">After</span>
+                </button>
+                <figcaption>Restored to a rich, warm timber finish.</figcaption>
+              </figure>
+            </div>
+          </article>
 
-        <!-- Matched before/after photos (same viewpoint) use a draggable comparison:
-             copy the markup in tests/fixtures/compare.html. None of the current photos
-             are taken from the same position, so none is shown here yet. -->
+          <article class="pair" aria-labelledby="pair-house-title" data-scene>
+            <div class="pair__head">
+              <span class="pair__num" aria-hidden="true">02</span>
+              <h3 id="pair-house-title">Single-storey home repaint</h3>
+              <p>Yellow walls repainted white for a crisp, modern frontage.</p>
+              <p class="pair__note">Photographed from slightly different angles.</p>
+            </div>
+            <div class="pair__grid">
+              <figure class="pair__item pair__item--before">
+                <button class="shot" type="button" data-shot data-full="{{full:house-before-yellow}}" data-w="{{w:house-before-yellow}}" data-h="{{h:house-before-yellow}}"
+                        data-caption="Before: yellow walls with dark trim and roller doors." aria-label="Enlarge before photo: yellow walls with dark trim and roller doors">
+                  <x-img name="house-before-yellow" sizes="(min-width: 960px) 46vw, 100vw" alt="The home before painting, with yellow walls"></x-img>
+                  <span class="label">Before</span>
+                </button>
+                <figcaption>Yellow walls with dark trim and roller doors.</figcaption>
+              </figure>
+              <figure class="pair__item pair__item--after">
+                <button class="shot" type="button" data-shot data-full="{{full:house-after-white}}" data-w="{{w:house-after-white}}" data-h="{{h:house-after-white}}"
+                        data-caption="After: walls repainted white, with dark fascia, gutters and roller doors." aria-label="Enlarge after photo: walls repainted white, with dark fascia, gutters and roller doors">
+                  <x-img name="house-after-white" sizes="(min-width: 960px) 46vw, 100vw" alt="The same home after painting, with white walls"></x-img>
+                  <span class="label label--after">After</span>
+                </button>
+                <figcaption>Walls repainted white, with dark fascia, gutters and roller doors.</figcaption>
+              </figure>
+            </div>
+          </article>
+        </div>
 
+        <h3 class="gallery__title">More work</h3>
         <ul class="gallery" role="list">
           <li class="gallery__item" style="--ar: 1.776" data-reveal>
             <button class="shot" type="button" data-shot data-full="{{full:weatherboard-in-progress}}" data-w="{{w:weatherboard-in-progress}}" data-h="{{h:weatherboard-in-progress}}"
                     data-caption="Weatherboard cottage mid-repaint, with the green trim going to white." aria-label="Enlarge photo: weatherboard cottage mid-repaint">
-              <x-img name="weatherboard-in-progress" sizes="(min-width: 960px) 60vw, 100vw" alt="Weatherboard cottage being repainted, with ladders on site and green trim partly painted white"></x-img>
+              <x-img name="weatherboard-in-progress" sizes="(min-width: 960px) 70vw, 100vw" alt="Weatherboard cottage being repainted, with ladders on site and green trim partly painted white"></x-img>
             </button>
             <p class="gallery__caption">Weatherboard cottage mid-repaint, with the green trim going to white.</p>
           </li>
           <li class="gallery__item" style="--ar: 0.5636" data-reveal>
             <button class="shot" type="button" data-shot data-full="{{full:brick-exterior-white}}" data-w="{{w:brick-exterior-white}}" data-h="{{h:brick-exterior-white}}"
                     data-caption="Painted brick exterior in white, with dark window frames and downpipes." aria-label="Enlarge photo: painted brick exterior">
-              <x-img name="brick-exterior-white" sizes="(min-width: 960px) 20vw, 50vw" alt="White painted brick wall with black downpipes and window frames"></x-img>
+              <x-img name="brick-exterior-white" sizes="(min-width: 960px) 24vw, 50vw" alt="White painted brick wall with black downpipes and window frames"></x-img>
             </button>
             <p class="gallery__caption">Painted brick exterior with dark frames and downpipes.</p>
-          </li>
-          <li class="gallery__item" style="--ar: 0.5636" data-reveal>
-            <button class="shot" type="button" data-shot data-full="{{full:timber-outdoor-setting}}" data-w="{{w:timber-outdoor-setting}}" data-h="{{h:timber-outdoor-setting}}"
-                    data-caption="Restored timber outdoor table and chairs." aria-label="Enlarge photo: restored timber outdoor setting">
-              <x-img name="timber-outdoor-setting" sizes="(min-width: 960px) 20vw, 50vw" alt="Timber outdoor table and folding chairs with a rich oiled finish on a sunny deck"></x-img>
-            </button>
-            <p class="gallery__caption">Restored timber outdoor table and chairs.</p>
           </li>
         </ul>
       </div>

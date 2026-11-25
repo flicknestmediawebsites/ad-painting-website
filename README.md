@@ -40,6 +40,10 @@ decorative work are available, replace the two `<img>` tags in `.finishes__wide`
 and `.finishes__detail` (a close-up crop of the same photo). Then remove the `.finishes__note`
 line and the texture image in the services frame (`data-service-pic="5"`).
 
+**Before-and-after projects:** each job is an `<article class="pair">` in the Projects section.
+Copy an existing one, change the two `<x-img>` names and the captions, and add `pair--portrait` for
+upright photos. The scroll animation applies automatically.
+
 **Matched before/after photos:** if a pair is taken from the same position, use the draggable
 slider markup from `tests/fixtures/compare.html` in the Projects section. Pairs taken from
 different angles should stay as labelled side-by-side photos (the `.pair` block).

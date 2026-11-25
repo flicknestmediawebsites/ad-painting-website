@@ -353,7 +353,7 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 8px); }
 .motion .finishes__copy { transform: translate3d(0, calc((.5 - var(--p)) * 60px), 0); }
 
 /* ---------- Projects ---------- */
-.projects { position: relative; z-index: 2; background: var(--paper); padding: clamp(80px, 11vw, 160px) 0; }
+.projects { position: relative; z-index: 2; overflow-x: clip; background: var(--paper); padding: clamp(80px, 11vw, 160px) 0; }
 
 .shot {
   position: relative; display: block; width: 100%; padding: 0; margin: 0;
@@ -364,16 +364,49 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 8px); }
 .shot:hover img { transform: scale(1.025); }
 .shot:focus-visible { outline-offset: 4px; }
 
-.pair { margin-bottom: clamp(48px, 7vw, 96px); }
-.pair__head { display: grid; gap: 8px; margin-bottom: 22px; }
-.pair__head h3 { font-size: clamp(1.6rem, 2.6vw, 2.3rem); }
-.pair__head p { color: var(--ink-2); }
-@media (min-width: 900px) { .pair__head { grid-template-columns: 1fr auto; align-items: end; } }
-.pair__grid { display: grid; gap: 16px; }
-@media (min-width: 720px) { .pair__grid { grid-template-columns: 1fr 1fr; } }
-.pair__item { margin: 0; }
-.pair__item .shot { aspect-ratio: 2000 / 1126; }
+.pairs { display: grid; gap: clamp(64px, 9vw, 128px); margin-bottom: clamp(72px, 10vw, 140px); }
+.pair { --p: .5; --t: 1; }
+.pair__head { display: grid; gap: 10px; margin-bottom: 24px; align-content: start; }
+.pair__num { font: 500 .9rem/1 var(--sans); letter-spacing: .1em; color: var(--timber); font-variant-numeric: tabular-nums; }
+.pair__head h3 { font-size: clamp(1.8rem, 3.4vw, 3rem); }
+.pair__head p { color: var(--ink-2); max-width: 40ch; font-size: 1.05em; }
+.pair__head .pair__note { font-size: .88rem; color: var(--ink-3); }
+.pair__grid { display: grid; gap: 16px; perspective: 1400px; }
+.pair__item { margin: 0; transform-style: preserve-3d; }
+.pair__item .shot { aspect-ratio: 2000 / 1126; box-shadow: 0 30px 60px -40px rgb(0 0 0 / .55); }
 .pair__item figcaption { margin-top: 10px; font-size: .92rem; color: var(--ink-2); }
+@media (min-width: 720px) { .pair__grid { grid-template-columns: 1fr 1fr; } }
+
+/* Upright photos: text beside the pair on large screens, two columns even on phones */
+.pair--portrait .pair__grid { grid-template-columns: 1fr 1fr; gap: clamp(10px, 2vw, 20px); }
+.pair--portrait .pair__item .shot { aspect-ratio: 656 / 1164; }
+.pair--portrait .pair__item--after { margin-top: clamp(28px, 6vw, 72px); }
+@media (min-width: 960px) {
+  .pair--portrait { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: clamp(40px, 6vw, 96px); align-items: center; }
+  .pair--portrait .pair__head { margin-bottom: 0; }
+  .pair:not(.pair--portrait) .pair__head { grid-template-columns: auto 1fr; column-gap: 24px; }
+  .pair:not(.pair--portrait) .pair__head > :not(.pair__num) { grid-column: 2; }
+  .pair:not(.pair--portrait) .pair__num { grid-row: 1; padding-top: .9em; }
+}
+
+/* Scroll-linked assembly: the two photos swing in from either side and settle
+   flat; the After photo rises faster and wipes into view. Fully reversible. */
+.motion .pair { --t: clamp(0, (var(--p) - .06) * 3.4, 1); --t2: clamp(0, (var(--p) - .1) * 3.4, 1); }
+.motion .pair__head { transform: translate3d(0, calc((1 - var(--t)) * 48px), 0); opacity: calc(.3 + var(--t) * .7); }
+.motion .pair__item--before {
+  transform: translate3d(calc((1 - var(--t)) * -16%), calc((1 - var(--t)) * 50px), 0) rotateY(calc((1 - var(--t)) * 24deg));
+  transform-origin: 0% 50%;
+  opacity: calc(.35 + var(--t) * .65);
+}
+.motion .pair__item--after {
+  transform: translate3d(calc((1 - var(--t)) * 16%), calc((1 - var(--t)) * 140px), calc((1 - var(--t)) * 60px)) rotateY(calc((1 - var(--t)) * -24deg));
+  transform-origin: 100% 50%;
+  opacity: calc(.35 + var(--t) * .65);
+}
+.motion .pair__item--after .shot img { clip-path: inset(0 0 0 calc((1 - var(--t2)) * 100%)); transition: none; }
+.motion .pair__item--after .shot:hover img { transform: none; }
+
+.gallery__title { font-size: clamp(1.6rem, 2.6vw, 2.3rem); margin-bottom: 22px; }
 .label {
   position: absolute; left: 14px; top: 14px;
   padding: 7px 14px; border-radius: 999px;
