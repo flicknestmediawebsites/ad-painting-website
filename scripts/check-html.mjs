@@ -19,8 +19,8 @@ for (const [tag] of html.matchAll(/<img\b[^>]*>/g)) {
   if (!/\swidth="\d+"/.test(tag) && !tag.includes('data-lightbox-img')) problems.push(`img without width: ${tag.slice(0, 80)}`);
 }
 
-const files = new Set([...html.matchAll(/\/images\/[a-z0-9-]+\.(?:avif|webp|jpg)/g)].map((m) => m[0]));
-for (const f of files) if (!existsSync(`dist${f}`)) problems.push(`missing file ${f}`);
+const files = new Set([...html.matchAll(/images\/[a-z0-9-]+\.(?:avif|webp|jpg)/g)].map((m) => m[0]));
+for (const f of files) if (!existsSync(`dist/${f}`)) problems.push(`missing file ${f}`);
 
 for (const needle of ['<title>', 'name="description"', 'rel="icon"', 'lang="en-AU"', 'name="viewport"']) {
   if (!html.includes(needle)) problems.push(`missing ${needle}`);

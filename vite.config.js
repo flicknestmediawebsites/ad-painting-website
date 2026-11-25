@@ -22,7 +22,7 @@ function renderImage(tag) {
   const pcls = attr(tag, 'pclass');
   const style = attr(tag, 'style');
   const priority = has(tag, 'priority');
-  const set = (ext) => meta.widths.map((w) => `/images/${name}-${w}.${ext} ${w}w`).join(', ');
+  const set = (ext) => meta.widths.map((w) => `images/${name}-${w}.${ext} ${w}w`).join(', ');
   const fallbackW = meta.widths.find((w) => w >= 1200) || meta.widths.at(-1);
   return (
     `<picture${pcls ? ` class="${pcls}"` : ''}>` +
@@ -55,7 +55,7 @@ const sitePlugin = {
       return html
         .replace(/<x-img\b[^>]*><\/x-img>/g, renderImage)
         .replace('<!-- social-links -->', renderSocial())
-        .replace(/\{\{full:([a-z0-9-]+)\}\}/g, (_, n) => `/images/${n}-${images[n].widths.at(-1)}.webp`)
+        .replace(/\{\{full:([a-z0-9-]+)\}\}/g, (_, n) => `images/${n}-${images[n].widths.at(-1)}.webp`)
         .replace(/\{\{w:([a-z0-9-]+)\}\}/g, (_, n) => images[n].width)
         .replace(/\{\{h:([a-z0-9-]+)\}\}/g, (_, n) => images[n].height);
     },
@@ -64,5 +64,6 @@ const sitePlugin = {
 
 export default defineConfig({
   plugins: [sitePlugin],
+  base: './',
   build: { target: 'es2019', cssMinify: true },
 });

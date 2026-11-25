@@ -77,7 +77,7 @@ async function desktop(browser) {
   check((await page.title()).includes('A.D painting & Special FX.'), 'page title names the business');
   const desc = await page.getAttribute('meta[name="description"]', 'content');
   check(/house painting/i.test(desc) && /marble/i.test(desc) && /plaster/i.test(desc), 'meta description lists real services');
-  check(await page.locator('link[rel="icon"][href="/favicon.svg"]').count() === 1, 'favicon linked');
+  check(await page.locator('link[rel="icon"][href="favicon.svg"]').count() === 1, 'favicon linked');
   check((await page.textContent('h1')).trim() === 'House painting and decorative finishes', 'hero headline exact');
   check((await page.textContent('.hero__brand')).trim() === 'A.D painting & Special FX.', 'business name exact in hero');
   for (const name of ['Request a quote', 'View projects']) {
